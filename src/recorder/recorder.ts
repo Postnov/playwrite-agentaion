@@ -9,6 +9,7 @@ import type { Annotation, Recording } from '../types.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RECORDINGS_DIR = path.resolve(__dirname, '../../recordings');
+const WELCOME_PAGE = path.resolve(__dirname, 'welcome.html');
 
 function ensureRecordingsDir(): void {
   if (!fs.existsSync(RECORDINGS_DIR)) {
@@ -37,14 +38,13 @@ function waitForQuit(): Promise<void> {
 }
 
 export async function startRecording(
-  url: string,
+  url?: string,
   configOverrides?: Partial<Config>,
 ): Promise<string> {
   const config = loadConfig(configOverrides);
   ensureRecordingsDir();
 
   log.info(`Starting recording session`);
-  log.info(`URL: ${url}`);
 
   const page = await launch(config);
 
@@ -52,7 +52,7 @@ export async function startRecording(
   const allAnnotations: Annotation[] = [];
 
   // Track current page URL for each annotation
-  let currentUrl = url;
+  let currentUrl = url || '';
 
   page.on('framenavigated', (frame) => {
     if (frame === page.mainFrame()) {
@@ -60,8 +60,14 @@ export async function startRecording(
     }
   });
 
-  // Navigate
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  // Navigate to URL or welcome page
+  if (url) {
+    log.info(`URL: ${url}`);
+    await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  } else {
+    log.info('No URL specified — opening welcome page');
+    await page.goto(`file://${WELCOME_PAGE}`, { waitUntil: 'domcontentloaded' });
+  }
 
   // Inject Agentation UI + auto-reinject on navigation
   await injectAgentation(page, {
@@ -92,8 +98,12 @@ export async function startRecording(
 
   log.success('Recording started!');
   console.log('');
-  console.log('  Annotate elements in the browser. Navigate freely between pages.');
-  console.log('  Press Q to finish and save all annotations.');
+  if (!url) {
+    console.log('  Navigate to any website in the browser — Agentation will appear automatically.');
+  } else {
+    console.log('  Annotate elements in the browser. Navigate freely between pages.');
+  }
+  console.log('  Press "Copy JSON" in the browser or Q in terminal to finish.');
   console.log('');
 
   // Wait for user to press Q
@@ -108,8 +118,9 @@ export async function startRecording(
   }
 
   // Save recording
+  const startUrl = url || allAnnotations[0]?.url || '';
   const recording: Recording = {
-    startUrl: url,
+    startUrl,
     annotations: allAnnotations,
     createdAt: Date.now(),
   };
