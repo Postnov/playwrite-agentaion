@@ -6,12 +6,12 @@ Maputo объединяет [Playwright](https://playwright.dev/) и [Agentation
 
 ```
 1. record  →  Открывается браузер с Agentation UI
-               Вы кликаете по элементам, добавляете комментарии
+               Кликаете по элементам, добавляете комментарии
                Переходите между страницами — аннотации собираются со всех
 
-2. По завершении записи — в терминале появляется готовый markdown
-   со всеми шагами со всех страниц. Копируете → вставляете в AI-чат
-   (Claude, ChatGPT, etc.) → AI пишет Playwright-скрипт
+2. Нажимаете кнопку копирования в панели Agentation
+   → JSON всех аннотаций со всех страниц копируется в буфер
+   → Вставляете в AI-чат (Claude, ChatGPT, etc.) → AI пишет Playwright-скрипт
 
 3. run     →  Запускаете сгенерированный скрипт
 ```
@@ -35,7 +35,11 @@ npm run build:bundle
 ### 1. Запись аннотаций
 
 ```bash
-npx tsx src/index.ts record --url "https://dodopizza.uz/tashkent"
+# С указанием URL — сразу на нужную страницу
+npx tsx src/index.ts record --url "https://dev-postnov.ru"
+
+# Без URL — откроется welcome-страница с инструкциями
+npx tsx src/index.ts record
 ```
 
 Откроется Chromium. В правом нижнем углу появится тулбар Agentation:
@@ -43,38 +47,35 @@ npx tsx src/index.ts record --url "https://dodopizza.uz/tashkent"
 - **Кликните по элементу** — он будет аннотирован (маркер с номером)
 - **Добавьте комментарий** — опишите, что нужно сделать с этим элементом
 - **Выделите текст** — для аннотации текстового контента
-- **Перетащите область** — для выделения нескольких элементов
-- **Переходите по ссылкам** — Agentation автоматически появится на новой странице
+- **Переходите по ссылкам** — Agentation автоматически появится на новой странице, аннотации собираются со всех страниц
 
-В терминале:
-- **Enter** — сохранить текущий шаг (опишите действие), перейти к следующему
-- **q** — завершить запись
+Когда закончили:
 
-По завершении записи:
-- Сохраняется JSON: `recordings/recording-<timestamp>.json`
-- Сохраняется Markdown: `recordings/recording-<timestamp>.md`
-- В терминале выводится полный markdown со всех страниц — готовый для копирования
+- **Кнопка копирования в Agentation** — копирует JSON всех аннотаций со всех страниц в буфер обмена
+- Или **Q в терминале** — завершает запись, сохраняет JSON и Markdown в `recordings/`
 
 ### 2. Генерация скрипта через AI
 
-Скопируйте markdown из терминала (или из `.md` файла) и вставьте в чат с AI. Пример:
+Вставьте скопированный JSON в чат с AI:
 
 ```
 Напиши Playwright-скрипт на TypeScript по этим аннотациям:
 
-## Recording: https://dev-postnov.ru
-
-### Step 1. Ищем статью про НДА
-**Page:** https://dev-postnov.ru
-
-- **button [Поиск]** — "Клик на поиск"
-  **Selector:** `.header > .header-container > .header-actions > #search-open`
-
-- **input "Поиск по заметкам..."** — "Вводим «НДА» и ждем списка ссылок"
-  **Selector:** `#search-modal > .search-modal-content > .search-modal-header > #search-input`
-
-- **link "Решаем проблему НДА"** — "Кликаем на ссылку"
-  **Selector:** `.search-modal-content > #search-results > .search-result-item > .search-result-title`
+[
+  {
+    "element": "button [Поиск]",
+    "elementPath": ".header > .header-container > .header-actions > #search-open",
+    "comment": "Клик по поиску",
+    "url": "https://dev-postnov.ru/"
+  },
+  {
+    "element": "input \"Поиск по заметкам...\"",
+    "elementPath": "#search-input",
+    "comment": "Пишем тут «НДА»",
+    "url": "https://dev-postnov.ru/"
+  },
+  ...
+]
 ```
 
 AI сгенерирует готовый скрипт. Сохраните его в `generated/`.
@@ -98,17 +99,19 @@ maputo/
 ├── src/
 │   ├── index.ts              # CLI: record | run
 │   ├── config.ts             # Настройки браузера (Zod)
-│   ├── types.ts              # Типы: Annotation, RecordedStep, Recording
+│   ├── types.ts              # Типы: Annotation, Recording
 │   ├── browser/
 │   │   └── browser-manager.ts  # Playwright lifecycle
 │   ├── recorder/
 │   │   ├── recorder.ts       # Оркестрация записи + markdown-вывод
-│   │   └── inject.ts         # Инъекция Agentation UI + авто-реинжект
+│   │   ├── inject.ts         # Инъекция Agentation UI + авто-реинжект
+│   │   └── welcome.html      # Страница инструкций (без --url)
 │   ├── runner/
 │   │   └── runner.ts         # Запуск скриптов
 │   └── utils/
 │       └── logger.ts         # Цветной лог
 ├── scripts/
+│   ├── agentation-mount.tsx  # React-обёртка Agentation для бандла
 │   └── build-bundle.ts       # Сборка Agentation IIFE-бандла
 ├── dist/
 │   └── agentation-bundle.js  # Собранный бандл (~300KB)
@@ -123,31 +126,30 @@ Agentation — это React-компонент. Чтобы он работал �
 
 1. **Собираем бандл** (`npm run build:bundle`): esbuild пакует React + ReactDOM + Agentation в один IIFE-файл (~300KB)
 2. **Инжектим в страницу**: Playwright вызывает `page.addScriptTag({ content: bundleCode })`
-3. **Bridge для данных**: `page.exposeFunction()` создаёт мост — аннотации из браузера приходят в Node.js через колбэки
+3. **Bridge для данных**: `page.exposeFunction()` создаёт мост — аннотации из браузера приходят в Node.js через колбэки, а `getAllAnnotations` возвращает все собранные аннотации обратно в браузер
 4. **Авто-реинжект**: при переходе между страницами Agentation автоматически появляется заново, а все собранные аннотации сохраняются на стороне Node.js
+5. **Кнопка копирования**: встроена в тулбар Agentation — копирует JSON всех аннотаций со всех страниц
 
 ## Команды
 
 ```bash
 npm run build:bundle      # Собрать Agentation-бандл
-npm run record            # Запустить запись (нужен --url)
-npm run run:script        # Запустить скрипт (нужен --script)
 npm test                  # Запустить все тесты
 npm run test:unit         # Только юнит-тесты
 ```
 
 ## Примеры
 
-### Поиск статьи и клик на dev-postnov.ru
+### Поиск статьи на dev-postnov.ru
 
 ```bash
 # Запись
 npx tsx src/index.ts record --url "https://dev-postnov.ru"
 
-# В браузере: кликаем Поиск → вводим «НДА» → кликаем на ссылку → кликаем «Уважаемо»
-# В терминале: Enter (описываем шаг) → q (завершаем)
+# В браузере: Поиск → «НДА» → клик на ссылку → копируем JSON
+# Вставляем JSON в AI-чат → получаем скрипт
 
-# Запуск готового скрипта
+# Запуск
 npx tsx src/index.ts run --script generated/dev-postnov-nda.ts
 ```
 
@@ -157,11 +159,19 @@ npx tsx src/index.ts run --script generated/dev-postnov-nda.ts
 # Запись
 npx tsx src/index.ts record --url "https://dodopizza.uz/tashkent"
 
-# В браузере: кликаем «Пицца» → кликаем «Выбрать» у Пепперони
-# В терминале: Enter (описываем шаг) → q (завершаем)
+# В браузере: «Пицца» → «Выбрать» у Пепперони → копируем JSON
 
-# Запуск готового скрипта
+# Запуск
 npx tsx src/index.ts run --script generated/dodo-pepperoni.ts
+```
+
+### Запуск без URL
+
+```bash
+# Откроется welcome-страница с инструкциями
+npx tsx src/index.ts record
+
+# Вводите URL в адресной строке → Agentation появится автоматически
 ```
 
 ## Технологии
