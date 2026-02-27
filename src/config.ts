@@ -1,7 +1,4 @@
 import { z } from 'zod';
-import dotenv from 'dotenv';
-
-dotenv.config();
 
 export const ConfigSchema = z.object({
   browser: z.object({

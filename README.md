@@ -85,7 +85,7 @@ npx tsx generated/dodo-pepperoni.ts
 maputo/
 ├── src/
 │   ├── index.ts              # CLI: record | run
-│   ├── config.ts             # Настройки браузера (Zod + .env)
+│   ├── config.ts             # Настройки браузера (Zod)
 │   ├── types.ts              # Типы: Annotation, RecordedStep, Recording
 │   ├── browser/
 │   │   └── browser-manager.ts  # Playwright lifecycle
@@ -112,15 +112,6 @@ Agentation — это React-компонент. Чтобы он работал �
 1. **Собираем бандл** (`npm run build:bundle`): esbuild пакует React + ReactDOM + Agentation в один IIFE-файл (~300KB)
 2. **Инжектим в страницу**: Playwright вызывает `page.addScriptTag({ content: bundleCode })`
 3. **Bridge для данных**: `page.exposeFunction()` создаёт мост — аннотации из браузера приходят в Node.js через колбэки
-
-## Настройка
-
-Файл `.env` (опционально):
-
-```env
-MAPUTO_HEADLESS=false    # true для запуска без окна браузера
-MAPUTO_LOCALE=ru-RU      # Локаль браузера
-```
 
 ## Команды
 
