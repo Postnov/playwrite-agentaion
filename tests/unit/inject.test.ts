@@ -47,11 +47,11 @@ describe('types', () => {
   it('Recording type has required fields', () => {
     const recording = {
       startUrl: 'https://example.com',
-      steps: [],
+      annotations: [],
       createdAt: Date.now(),
     };
     expect(recording.startUrl).toBe('https://example.com');
-    expect(recording.steps).toEqual([]);
+    expect(recording.annotations).toEqual([]);
   });
 });
 

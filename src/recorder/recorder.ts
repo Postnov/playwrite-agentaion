@@ -1,12 +1,11 @@
 import fs from 'fs';
 import path from 'path';
-import readline from 'readline';
 import { fileURLToPath } from 'url';
 import { launch, close } from '../browser/browser-manager.ts';
 import { loadConfig, type Config } from '../config.ts';
 import { injectAgentation } from './inject.ts';
 import { log } from '../utils/logger.ts';
-import type { Annotation, RecordedStep, Recording } from '../types.ts';
+import type { Annotation, Recording } from '../types.ts';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const RECORDINGS_DIR = path.resolve(__dirname, '../../recordings');
@@ -17,16 +16,23 @@ function ensureRecordingsDir(): void {
   }
 }
 
-function createReadlineInterface(): readline.Interface {
-  return readline.createInterface({
-    input: process.stdin,
-    output: process.stdout,
-  });
-}
-
-function askQuestion(rl: readline.Interface, question: string): Promise<string> {
+function waitForQuit(): Promise<void> {
   return new Promise((resolve) => {
-    rl.question(question, (answer) => resolve(answer.trim()));
+    process.stdin.setRawMode?.(true);
+    process.stdin.resume();
+    process.stdin.setEncoding('utf8');
+
+    const onData = (key: string) => {
+      // q or Ctrl+C
+      if (key === 'q' || key === '\u0003') {
+        process.stdin.setRawMode?.(false);
+        process.stdin.pause();
+        process.stdin.removeListener('data', onData);
+        resolve();
+      }
+    };
+
+    process.stdin.on('data', onData);
   });
 }
 
@@ -40,125 +46,94 @@ export async function startRecording(
   log.info(`Starting recording session`);
   log.info(`URL: ${url}`);
 
-  // Launch browser
   const page = await launch(config);
 
-  // Track annotations for current step
-  let currentAnnotations: Annotation[] = [];
+  // All annotations collected across all pages
+  const allAnnotations: Annotation[] = [];
 
-  // Navigate to start URL
-  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+  // Track current page URL for each annotation
+  let currentUrl = url;
 
-  // Inject Agentation UI with callbacks + auto-reinject on navigation
-  await injectAgentation(page, {
-    onAnnotationAdd: (annotation) => {
-      currentAnnotations.push(annotation);
-      log.info(`Annotation added: ${annotation.element} — "${annotation.comment || '(no comment)'}"`);
-    },
-    onAnnotationDelete: (annotation) => {
-      currentAnnotations = currentAnnotations.filter((a) => a.id !== annotation.id);
-      log.info(`Annotation removed: ${annotation.element}`);
-    },
-    onAnnotationUpdate: (annotation) => {
-      const idx = currentAnnotations.findIndex((a) => a.id === annotation.id);
-      if (idx >= 0) currentAnnotations[idx] = annotation;
-      log.info(`Annotation updated: ${annotation.element}`);
-    },
-    onSubmit: (markdown, annotations) => {
-      log.info(`Submit received — ${annotations.length} annotations`);
-      log.info(`Markdown preview:\n${markdown.slice(0, 200)}...`);
-    },
+  page.on('framenavigated', (frame) => {
+    if (frame === page.mainFrame()) {
+      currentUrl = page.url();
+    }
   });
 
-  // Recording loop
-  const steps: RecordedStep[] = [];
-  const rl = createReadlineInterface();
-  let stepNumber = 1;
+  // Navigate
+  await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 30000 });
 
-  log.success('Recording started! Agentation UI should be visible in the browser.');
-  console.log('');
-  console.log('Commands:');
-  console.log('  Enter     — Save current step and start next');
-  console.log('  q + Enter — Finish recording and save');
-  console.log('');
-  log.info('Agentation will persist across page navigations.');
-
-  let running = true;
-  while (running) {
-    const input = await askQuestion(
-      rl,
-      `\n[Step ${stepNumber}] Annotate elements, then press Enter (or 'q' to finish): `,
-    );
-
-    if (input.toLowerCase() === 'q') {
-      // Save remaining annotations as last step if any
-      if (currentAnnotations.length > 0) {
-        const action = await askQuestion(rl, 'Describe this final step: ');
-        steps.push({
-          stepNumber,
-          url: page.url(),
-          action,
-          annotations: [...currentAnnotations],
-        });
-        log.action(`Step ${stepNumber} saved: "${action}" (${currentAnnotations.length} annotations)`);
+  // Inject Agentation UI + auto-reinject on navigation
+  await injectAgentation(page, {
+    onAnnotationAdd: (annotation) => {
+      const enriched: Annotation = { ...annotation, url: currentUrl };
+      allAnnotations.push(enriched);
+      log.info(`[${allAnnotations.length}] ${annotation.element} — "${annotation.comment || '(no comment)'}"`);
+    },
+    onAnnotationDelete: (annotation) => {
+      const idx = allAnnotations.findIndex((a) => a.id === annotation.id);
+      if (idx >= 0) {
+        allAnnotations.splice(idx, 1);
+        log.info(`Removed: ${annotation.element}`);
       }
-      running = false;
-      break;
-    }
+    },
+    onAnnotationUpdate: (annotation) => {
+      const idx = allAnnotations.findIndex((a) => a.id === annotation.id);
+      if (idx >= 0) {
+        allAnnotations[idx] = { ...annotation, url: allAnnotations[idx].url };
+        log.info(`Updated: ${annotation.element}`);
+      }
+    },
+    onSubmit: () => {
+      // Not used — we collect everything ourselves
+    },
+    getAllAnnotations: () => allAnnotations,
+  });
 
-    if (currentAnnotations.length === 0) {
-      log.info('No annotations yet. Add some in the browser, then press Enter.');
-      continue;
-    }
+  log.success('Recording started!');
+  console.log('');
+  console.log('  Annotate elements in the browser. Navigate freely between pages.');
+  console.log('  Press Q to finish and save all annotations.');
+  console.log('');
 
-    const action = await askQuestion(rl, 'Describe this step: ');
+  // Wait for user to press Q
+  await waitForQuit();
 
-    steps.push({
-      stepNumber,
-      url: page.url(),
-      action,
-      annotations: [...currentAnnotations],
-    });
+  console.log('');
 
-    log.action(`Step ${stepNumber} saved: "${action}" (${currentAnnotations.length} annotations)`);
-    currentAnnotations = [];
-    stepNumber++;
+  if (allAnnotations.length === 0) {
+    log.info('No annotations recorded.');
+    await close();
+    return '';
   }
-
-  rl.close();
 
   // Save recording
   const recording: Recording = {
     startUrl: url,
-    steps,
+    annotations: allAnnotations,
     createdAt: Date.now(),
   };
 
   const ts = Date.now();
-  const jsonFile = `recording-${ts}.json`;
-  const mdFile = `recording-${ts}.md`;
-  const jsonPath = path.join(RECORDINGS_DIR, jsonFile);
-  const mdPath = path.join(RECORDINGS_DIR, mdFile);
+  const jsonPath = path.join(RECORDINGS_DIR, `recording-${ts}.json`);
+  const mdPath = path.join(RECORDINGS_DIR, `recording-${ts}.md`);
 
   fs.writeFileSync(jsonPath, JSON.stringify(recording, null, 2));
 
-  // Generate combined markdown with all steps from all pages
   const markdown = formatRecordingMarkdown(recording);
   fs.writeFileSync(mdPath, markdown);
 
-  log.success(`Recording saved!`);
+  log.success(`Recording saved! (${allAnnotations.length} annotations)`);
   log.info(`JSON: ${jsonPath}`);
   log.info(`Markdown: ${mdPath}`);
-  log.info(`Total steps: ${steps.length}`);
 
-  // Print markdown to terminal for easy copy
+  // Print markdown for easy copy
   console.log('\n' + '='.repeat(60));
   console.log('  COPY THIS INTO AI CHAT:');
   console.log('='.repeat(60) + '\n');
   console.log(markdown);
   console.log('='.repeat(60) + '\n');
 
-  // Close browser
   await close();
 
   return jsonPath;
@@ -170,19 +145,32 @@ function formatRecordingMarkdown(recording: Recording): string {
   lines.push(`## Recording: ${recording.startUrl}`);
   lines.push('');
 
-  for (const step of recording.steps) {
-    lines.push(`### Step ${step.stepNumber}. ${step.action}`);
-    lines.push(`**Page:** ${step.url}`);
+  // Group annotations by page URL (preserve order)
+  const pageGroups: { url: string; annotations: Annotation[] }[] = [];
+  for (const ann of recording.annotations) {
+    const last = pageGroups[pageGroups.length - 1];
+    if (last && last.url === ann.url) {
+      last.annotations.push(ann);
+    } else {
+      pageGroups.push({ url: ann.url, annotations: [ann] });
+    }
+  }
+
+  let globalIndex = 1;
+  for (const group of pageGroups) {
+    lines.push(`**Page:** ${group.url}`);
     lines.push('');
 
-    for (const ann of step.annotations) {
-      lines.push(`- **${ann.element}** — "${ann.comment || ''}"`);
-      lines.push(`  **Selector:** \`${ann.elementPath}\``);
-      if (ann.nearbyText) lines.push(`  **Nearby text:** ${ann.nearbyText}`);
-      if (ann.cssClasses) lines.push(`  **Classes:** \`${ann.cssClasses}\``);
-      if (ann.selectedText) lines.push(`  **Selected text:** "${ann.selectedText}"`);
-      if (ann.accessibility) lines.push(`  **Accessibility:** ${ann.accessibility}`);
+    for (const ann of group.annotations) {
+      lines.push(`### ${globalIndex}. ${ann.element}`);
+      lines.push(`**Selector:** \`${ann.elementPath}\``);
+      if (ann.comment) lines.push(`**Action:** ${ann.comment}`);
+      if (ann.nearbyText) lines.push(`**Nearby text:** ${ann.nearbyText}`);
+      if (ann.cssClasses) lines.push(`**Classes:** \`${ann.cssClasses}\``);
+      if (ann.selectedText) lines.push(`**Selected text:** "${ann.selectedText}"`);
+      if (ann.accessibility) lines.push(`**Accessibility:** ${ann.accessibility}`);
       lines.push('');
+      globalIndex++;
     }
   }
 

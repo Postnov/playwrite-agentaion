@@ -13,6 +13,7 @@ export interface Annotation {
   element: string;     // e.g. "button", "input", "link"
   elementPath: string; // e.g. "body > div > button"
   timestamp: number;
+  url: string;         // Page URL where annotation was made
   selectedText?: string;
   boundingBox?: BoundingBox;
   nearbyText?: string;
@@ -21,15 +22,8 @@ export interface Annotation {
   isFixed?: boolean;
 }
 
-export interface RecordedStep {
-  stepNumber: number;
-  url: string;
-  action: string;           // User description: "click on Pepperoni button"
-  annotations: Annotation[];
-}
-
 export interface Recording {
   startUrl: string;
-  steps: RecordedStep[];
+  annotations: Annotation[];
   createdAt: number;
 }

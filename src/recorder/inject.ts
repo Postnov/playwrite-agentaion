@@ -12,6 +12,7 @@ export interface InjectionCallbacks {
   onAnnotationDelete: (annotation: Annotation) => void;
   onAnnotationUpdate: (annotation: Annotation) => void;
   onSubmit: (markdown: string, annotations: Annotation[]) => void;
+  getAllAnnotations: () => Annotation[];
 }
 
 let bundleCode: string | null = null;
@@ -47,6 +48,10 @@ export async function setupBridge(page: Page, callbacks: InjectionCallbacks): Pr
 
   await page.exposeFunction('__maputo_onSubmit', (markdown: string, annotationsJson: string) => {
     callbacks.onSubmit(markdown, JSON.parse(annotationsJson));
+  });
+
+  await page.exposeFunction('__maputo_getAllAnnotations', () => {
+    return JSON.stringify(callbacks.getAllAnnotations());
   });
 }
 
