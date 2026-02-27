@@ -6,7 +6,7 @@ function printUsage(): void {
 Maputo — Browser annotation recorder for automation development
 
 Usage:
-  npx tsx src/index.ts record --url <url>
+  npx tsx src/index.ts record [--url <url>]
   npx tsx src/index.ts run --script <file>
 
 Commands:
@@ -14,7 +14,7 @@ Commands:
   run       Execute a Playwright script from generated/
 
 Options:
-  --url     Starting URL for recording
+  --url     Starting URL (optional — without it opens a welcome page)
   --script  Path to the Playwright script to run
 
 Workflow:
@@ -43,14 +43,11 @@ async function main(): Promise<void> {
 
   switch (command) {
     case 'record': {
-      if (!options.url) {
-        console.error('Error: --url is required for record command');
-        console.error('Example: npx tsx src/index.ts record --url "https://example.com"');
-        process.exit(1);
-      }
       const filepath = await startRecording(options.url);
-      console.log(`\nRecording saved to: ${filepath}`);
-      console.log('Next: copy the JSON and paste it into your AI chat to generate a Playwright script.');
+      if (filepath) {
+        console.log(`\nRecording saved to: ${filepath}`);
+        console.log('Next: copy the JSON and paste it into your AI chat to generate a Playwright script.');
+      }
       break;
     }
 

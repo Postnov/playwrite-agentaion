@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <title>Maputo — Начало записи</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+      background: #0f0f1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .container {
+      max-width: 640px;
+      padding: 48px 32px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      color: #fff;
+      margin-bottom: 8px;
+    }
+    .subtitle {
+      font-size: 15px;
+      color: #888;
+      margin-bottom: 40px;
+    }
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+      margin-bottom: 40px;
+    }
+    .step {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 32px;
+      height: 32px;
+      border-radius: 50%;
+      background: #1a1a3e;
+      border: 1px solid #333;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 600;
+      color: #7c8aff;
+    }
+    .step-text {
+      padding-top: 4px;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    .step-text strong {
+      color: #fff;
+    }
+    .step-text code {
+      background: #1a1a3e;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      color: #7c8aff;
+    }
+    .url-bar {
+      background: #1a1a2e;
+      border: 1px solid #333;
+      border-radius: 12px;
+      padding: 20px 24px;
+      text-align: center;
+    }
+    .url-bar p {
+      font-size: 15px;
+      color: #aaa;
+      margin-bottom: 4px;
+    }
+    .url-bar .hint {
+      font-size: 13px;
+      color: #666;
+    }
+    kbd {
+      background: #1a1a3e;
+      border: 1px solid #444;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 12px;
+      font-family: inherit;
+      color: #ccc;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Maputo</h1>
+    <p class="subtitle">Запись аннотаций для автоматизации</p>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num">1</div>
+        <div class="step-text">
+          <strong>Перейдите на нужный сайт</strong> — введите URL в адресной строке браузера
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">2</div>
+        <div class="step-text">
+          <strong>Кликайте по элементам</strong> — каждый клик создаёт аннотацию с селектором. Добавляйте комментарии, описывая действие
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">3</div>
+        <div class="step-text">
+          <strong>Переходите между страницами</strong> — Agentation автоматически появится на каждой новой странице. Аннотации собираются со всех страниц
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">4</div>
+        <div class="step-text">
+          <strong>Скопируйте результат</strong> — нажмите <code>Copy JSON</code> в браузере или <kbd>Q</kbd> в терминале для сохранения
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num">5</div>
+        <div class="step-text">
+          <strong>Вставьте в AI-чат</strong> — отправьте аннотации в Claude, ChatGPT или другой AI для генерации Playwright-скрипта
+        </div>
+      </div>
+    </div>
+
+    <div class="url-bar">
+      <p>Введите URL в адресной строке выше</p>
+      <span class="hint">Agentation появится автоматически</span>
+    </div>
+  </div>
+</body>
+</html>

@@ -12,20 +12,28 @@ export interface InjectionCallbacks {
   onAnnotationDelete: (annotation: Annotation) => void;
   onAnnotationUpdate: (annotation: Annotation) => void;
   onSubmit: (markdown: string, annotations: Annotation[]) => void;
+  getAllAnnotations: () => Annotation[];
+}
+
+let bundleCode: string | null = null;
+
+function loadBundle(): string {
+  if (!bundleCode) {
+    if (!fs.existsSync(BUNDLE_PATH)) {
+      throw new Error(
+        `Agentation bundle not found at ${BUNDLE_PATH}. Run "npm run build:bundle" first.`
+      );
+    }
+    bundleCode = fs.readFileSync(BUNDLE_PATH, 'utf-8');
+  }
+  return bundleCode;
 }
 
 /**
- * Inject the Agentation UI bundle into a Playwright page.
- * Sets up bridge functions so annotation events flow from browser to Node.js.
+ * Set up bridge functions (browser → Node.js) once per page.
+ * exposeFunction persists across navigations, so call this only once.
  */
-export async function injectAgentation(page: Page, callbacks: InjectionCallbacks): Promise<void> {
-  if (!fs.existsSync(BUNDLE_PATH)) {
-    throw new Error(
-      `Agentation bundle not found at ${BUNDLE_PATH}. Run "npm run build:bundle" first.`
-    );
-  }
-
-  // Expose bridge functions BEFORE injecting the script
+export async function setupBridge(page: Page, callbacks: InjectionCallbacks): Promise<void> {
   await page.exposeFunction('__maputo_onAnnotationAdd', (json: string) => {
     callbacks.onAnnotationAdd(JSON.parse(json));
   });
@@ -42,9 +50,38 @@ export async function injectAgentation(page: Page, callbacks: InjectionCallbacks
     callbacks.onSubmit(markdown, JSON.parse(annotationsJson));
   });
 
-  // Inject the bundle
-  const bundleCode = fs.readFileSync(BUNDLE_PATH, 'utf-8');
-  await page.addScriptTag({ content: bundleCode });
+  await page.exposeFunction('__maputo_getAllAnnotations', () => {
+    return JSON.stringify(callbacks.getAllAnnotations());
+  });
+}
+
+/**
+ * Inject the Agentation UI bundle into the current page.
+ * Safe to call multiple times (after each navigation).
+ */
+export async function injectBundle(page: Page): Promise<void> {
+  const code = loadBundle();
+  await page.addScriptTag({ content: code });
+}
+
+/**
+ * Full setup: bridge + injection + auto-reinject on navigation.
+ */
+export async function injectAgentation(page: Page, callbacks: InjectionCallbacks): Promise<void> {
+  // 1. Bridge — once
+  await setupBridge(page, callbacks);
+
+  // 2. Inject bundle into current page
+  await injectBundle(page);
+
+  // 3. Auto-reinject on every subsequent navigation
+  page.on('load', async () => {
+    try {
+      await injectBundle(page);
+    } catch {
+      // Page may be closing — ignore
+    }
+  });
 }
 
 /**
