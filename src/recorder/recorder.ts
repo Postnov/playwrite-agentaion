@@ -103,7 +103,7 @@ export async function startRecording(
   } else {
     console.log('  Annotate elements in the browser. Navigate freely between pages.');
   }
-  console.log('  Press "Copy JSON" in the browser or Q in terminal to finish.');
+  console.log('  Use the copy button in Agentation toolbar or press Q in terminal to finish.');
   console.log('');
 
   // Wait for user to press Q
