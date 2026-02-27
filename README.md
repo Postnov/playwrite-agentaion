@@ -9,11 +9,10 @@ Maputo объединяет [Playwright](https://playwright.dev/) и [Agentation
                Вы кликаете по элементам, добавляете комментарии
                Переходите между страницами — аннотации собираются со всех
 
-2. По завершении записи — в терминале появляется готовый markdown
-   со всеми шагами со всех страниц. Копируете → вставляете в AI-чат
-   (Claude, ChatGPT, etc.) → AI пишет Playwright-скрипт
+2. Нажимаете кнопку копирования в тулбаре — аннотации копируются в буфер обмена
+   Вставляете в AI-чат (Claude, ChatGPT, etc.) → AI пишет Playwright-скрипт
 
-3. run     →  Запускаете сгенерированный скрипт
+3. Запускаете сгенерированный скрипт напрямую через npx tsx
 ```
 
 ## Установка
@@ -35,7 +34,7 @@ npm run build:bundle
 ### 1. Запись аннотаций
 
 ```bash
-npx tsx src/index.ts record --url "https://dodopizza.uz/tashkent"
+npx tsx src/index.ts record --url "https://dev-postnov.ru"
 ```
 
 Откроется Chromium. В правом нижнем углу появится тулбар Agentation:
@@ -46,18 +45,15 @@ npx tsx src/index.ts record --url "https://dodopizza.uz/tashkent"
 - **Перетащите область** — для выделения нескольких элементов
 - **Переходите по ссылкам** — Agentation автоматически появится на новой странице
 
-В терминале:
-- **Enter** — сохранить текущий шаг (опишите действие), перейти к следующему
-- **q** — завершить запись
+Когда закончите — нажмите **кнопку копирования** в тулбаре Agentation. Аннотации скопируются в буфер обмена. Затем нажмите **Q** в терминале для завершения.
 
-По завершении записи:
-- Сохраняется JSON: `recordings/recording-<timestamp>.json`
-- Сохраняется Markdown: `recordings/recording-<timestamp>.md`
-- В терминале выводится полный markdown со всех страниц — готовый для копирования
+Записи также сохраняются локально:
+- `recordings/recording-<timestamp>.json`
+- `recordings/recording-<timestamp>.md`
 
 ### 2. Генерация скрипта через AI
 
-Скопируйте markdown из терминала (или из `.md` файла) и вставьте в чат с AI. Пример:
+Вставьте скопированный JSON в чат с AI. Пример:
 
 ```
 Напиши Playwright-скрипт на TypeScript по этим аннотациям:
@@ -80,12 +76,6 @@ npx tsx src/index.ts record --url "https://dodopizza.uz/tashkent"
 AI сгенерирует готовый скрипт. Сохраните его в `generated/`.
 
 ### 3. Запуск скрипта
-
-```bash
-npx tsx src/index.ts run --script generated/dev-postnov-nda.ts
-```
-
-Или напрямую:
 
 ```bash
 npx tsx generated/dev-postnov-nda.ts
@@ -134,34 +124,6 @@ npm run record            # Запустить запись (нужен --url)
 npm run run:script        # Запустить скрипт (нужен --script)
 npm test                  # Запустить все тесты
 npm run test:unit         # Только юнит-тесты
-```
-
-## Примеры
-
-### Поиск статьи и клик на dev-postnov.ru
-
-```bash
-# Запись
-npx tsx src/index.ts record --url "https://dev-postnov.ru"
-
-# В браузере: кликаем Поиск → вводим «НДА» → кликаем на ссылку → кликаем «Уважаемо»
-# В терминале: Enter (описываем шаг) → q (завершаем)
-
-# Запуск готового скрипта
-npx tsx src/index.ts run --script generated/dev-postnov-nda.ts
-```
-
-### Заказ пепперони на Dodo Pizza
-
-```bash
-# Запись
-npx tsx src/index.ts record --url "https://dodopizza.uz/tashkent"
-
-# В браузере: кликаем «Пицца» → кликаем «Выбрать» у Пепперони
-# В терминале: Enter (описываем шаг) → q (завершаем)
-
-# Запуск готового скрипта
-npx tsx src/index.ts run --script generated/dodo-pepperoni.ts
 ```
 
 ## Технологии
