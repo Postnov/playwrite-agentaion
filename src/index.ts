@@ -19,7 +19,7 @@ Options:
 
 Workflow:
   1. record  → Open browser, annotate elements → recordings/*.json
-  2. Copy JSON annotations → paste into AI chat → get Playwright script
+  2. Copy annotations (copy button in toolbar) → paste into AI chat → get Playwright script
   3. Save script to generated/*.ts
   4. run     → Execute the script
 `);
@@ -46,7 +46,7 @@ async function main(): Promise<void> {
       const filepath = await startRecording(options.url);
       if (filepath) {
         console.log(`\nRecording saved to: ${filepath}`);
-        console.log('Next: copy the JSON and paste it into your AI chat to generate a Playwright script.');
+        console.log('Next: paste the copied annotations into your AI chat to generate a Playwright script.');
       }
       break;
     }

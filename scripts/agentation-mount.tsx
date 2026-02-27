@@ -32,71 +32,17 @@ root.render(
     onSubmit: (markdown: string, annotations: unknown[]) => {
       window.__maputo_onSubmit?.(markdown, JSON.stringify(annotations));
     },
+    copyToClipboard: false,
+    onCopy: async () => {
+      try {
+        const json = await window.__maputo_getAllAnnotations?.();
+        if (!json) return;
+        const annotations = JSON.parse(json);
+        if (annotations.length === 0) return;
+        await navigator.clipboard.writeText(JSON.stringify(annotations, null, 2));
+      } catch (err) {
+        console.error('[Maputo] Copy failed:', err);
+      }
+    },
   })
 );
-
-// ── "Copy JSON" button ──
-const btn = document.createElement('button');
-btn.id = '__maputo-copy-json-btn';
-btn.textContent = 'Copy JSON';
-btn.title = 'Copy all annotations from all pages to clipboard';
-
-Object.assign(btn.style, {
-  position: 'fixed',
-  bottom: '16px',
-  left: '16px',
-  zIndex: '2147483646',
-  padding: '8px 16px',
-  background: '#1a1a2e',
-  color: '#fff',
-  border: '1px solid #333',
-  borderRadius: '8px',
-  fontSize: '13px',
-  fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-  cursor: 'pointer',
-  boxShadow: '0 2px 8px rgba(0,0,0,0.3)',
-  transition: 'background 0.2s, transform 0.1s',
-});
-
-btn.addEventListener('mouseenter', () => {
-  btn.style.background = '#2a2a4e';
-  btn.style.transform = 'scale(1.03)';
-});
-btn.addEventListener('mouseleave', () => {
-  btn.style.background = '#1a1a2e';
-  btn.style.transform = 'scale(1)';
-});
-
-btn.addEventListener('click', async () => {
-  try {
-    const json = await window.__maputo_getAllAnnotations?.();
-    if (!json) {
-      showFeedback('No annotations yet', '#f59e0b');
-      return;
-    }
-
-    const annotations = JSON.parse(json);
-    if (annotations.length === 0) {
-      showFeedback('No annotations yet', '#f59e0b');
-      return;
-    }
-
-    await navigator.clipboard.writeText(JSON.stringify(annotations, null, 2));
-    showFeedback(`Copied ${annotations.length} annotations`, '#10b981');
-  } catch (err) {
-    console.error('[Maputo] Copy failed:', err);
-    showFeedback('Copy failed', '#ef4444');
-  }
-});
-
-function showFeedback(text: string, color: string) {
-  const original = btn.textContent;
-  btn.textContent = text;
-  btn.style.background = color;
-  setTimeout(() => {
-    btn.textContent = original;
-    btn.style.background = '#1a1a2e';
-  }, 1500);
-}
-
-document.body.appendChild(btn);
